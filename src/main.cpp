@@ -4,8 +4,11 @@
 #include <RTClib.h>
 #include <PinChangeInterrupt.h>
 #include <FastLED.h>
+#include <SoftwareSerial.h>
 
 //Setup Libraries
+SoftwareSerial player(15, 16);
+
 CRGB leds[1];
 RTC_DS1307 rtc;
 TM1637Display LCD(12, 11);
@@ -19,32 +22,56 @@ int LEDState = 0;
 int spin = 0;
 int LCDBrightness = 7;
 static uint8_t cmdbuf[8] = {0};
+static uint8_t ansbuf[10] = {0};
+int numFold1 = 0;
 
 //Timers
 //internal timer when setting alarm
-int setupAlarmTimer = 0;
-int alarmIntTimer = 0;
 int mainTimer = 0;
 
 //Statuses
 boolean alarmSet = false;
 boolean alarmON = false;
+boolean alarmPlay = false;
+boolean trackPlay = false;
 
-void playerCommand(int8_t cmd, int16_t dat)
+// player commands
+#define CMD_SEL_DEV 0X09
+
+boolean playerAnswer(void)
+{
+  uint8_t i = 0;
+
+  // Pobieramy tylko 10 bajtow
+  while (player.available() && (i < 10))
+  {
+    uint8_t b = player.read();
+    ansbuf[i] = b;
+    i++;
+  }
+
+  if ((ansbuf[0] == 0x7E) && (ansbuf[9] == 0xEF))
+  {
+    return true;
+  }
+
+  return false;
+}
+void playerCommand(int8_t cmd, int8_t dat1 = 0, int8_t dat2 = 0)
 {
   delay(20);
-  cmdbuf[0] = 0x7e;               // bajt startu
-  cmdbuf[1] = 0xFF;               // wersja
-  cmdbuf[2] = 0x06;               // liczba bajtow polecenia
-  cmdbuf[3] = cmd;                // polecenie
-  cmdbuf[4] = 0x00;               // 0x00 = no feedback, 0x01 = feedback
-  cmdbuf[5] = (int8_t)(dat >> 8); // parametr DAT1
-  cmdbuf[6] = (int8_t)(dat);      //  parametr DAT2
-  cmdbuf[7] = 0xef;               // bajt konczacy
+  cmdbuf[0] = 0x7e;           // bajt startu
+  cmdbuf[1] = 0xFF;           // wersja
+  cmdbuf[2] = 0x06;           // liczba bajtow polecenia
+  cmdbuf[3] = cmd;            // polecenie
+  cmdbuf[4] = 0x00;           // 0x00 = no feedback, 0x01 = feedback
+  cmdbuf[5] = (int8_t)(dat1); // parametr DAT1
+  cmdbuf[6] = (int8_t)(dat2); //  parametr DAT2
+  cmdbuf[7] = 0xef;           // bajt konczacy
 
   for (uint8_t i = 0; i < 8; i++)
   {
-    Serial.write(cmdbuf[i]);
+    player.write(cmdbuf[i]);
   }
 }
 void blinkBlue(int times = 1)
@@ -80,19 +107,21 @@ void blinkRed(int times = 1)
 void updateTime()
 {
   DateTime now = rtc.now();
-  // if (timeH >= 18 || timeH <= 6)
-  // {
-  LCDBrightness = 2;
-  // }
-  // else
-  // {
-  // LCDBrightness = 7;
-  // }
+  if (timeH >= 18 || timeH <= 6)
+  {
+    LCDBrightness = 2;
+  }
+  else
+  {
+    LCDBrightness = 7;
+  }
   if (now.minute() != timeM)
   {
     timeM = now.minute();
     LCD.setBrightness(LCDBrightness);
     LCD.showNumberDecEx(timeM, (0x80 >> 1), true, 2, 2);
+    if (alarmON)
+      alarmON = false;
   }
   if (now.hour() != timeH)
   {
@@ -116,9 +145,13 @@ void alarmLED(int br = 255)
 }
 void setAlarm()
 {
+  int setupAlarmTimer = 0;
   LCD.setBrightness(7);
   LCD.showNumberDec(alarmH, false, 2, 0);
   LCD.showNumberDec(alarmM, true, 2, 2);
+  while (digitalRead(2) == LOW)
+  {
+  }
   while (setupAlarmTimer < 2500)
   {
     if (digitalRead(3) == LOW && setupAlarmTimer > (spin > 4 ? 20 : 80))
@@ -165,23 +198,28 @@ void setAlarm()
   LCD.showNumberDecEx(timeH, (0x80 >> 1), false, 2, 0);
 
   mainTimer = 0;
-  setupAlarmTimer = 0;
 }
 void setTime()
 {
+  int setupTimeTimer = 0;
   LCD.setBrightness(7);
   LCD.showNumberDec(timeH, false, 2, 0);
   LCD.showNumberDec(timeM, true, 2, 2);
-  while (setupAlarmTimer < 2500)
+  leds[0] = CHSV(120, 255, 255);
+  FastLED.show();
+  while (digitalRead(6) == LOW)
+  {
+  }
+  while (setupTimeTimer < 2500)
   {
     leds[0] = CHSV(120, 255, 255);
     FastLED.show();
-    if (digitalRead(3) == LOW && setupAlarmTimer > (spin > 4 ? 20 : 80))
+    if (digitalRead(3) == LOW && setupTimeTimer > (spin > 4 ? 20 : 80))
     {
       leds[0] = CRGB::Black;
       FastLED.show();
       spin++;
-      setupAlarmTimer = 0;
+      setupTimeTimer = 0;
       timeH++;
       if (timeH > 23)
       {
@@ -190,10 +228,10 @@ void setTime()
       LCD.showNumberDec(timeH, false, 2, 0);
     }
 
-    if (digitalRead(4) == LOW && setupAlarmTimer > (spin > 4 ? 20 : 80))
+    if (digitalRead(4) == LOW && setupTimeTimer > (spin > 4 ? 20 : 80))
     {
       spin++;
-      setupAlarmTimer = 0;
+      setupTimeTimer = 0;
       timeM++;
       if (timeM > 59)
       {
@@ -203,7 +241,7 @@ void setTime()
     }
     digitalRead(3) == HIGH &&digitalRead(4) == HIGH ? spin = 0 : spin = spin;
 
-    if (digitalRead(6) == LOW && setupAlarmTimer > 200)
+    if (digitalRead(6) == LOW && setupTimeTimer > 200)
     {
       //bring back the clock after setup
       DateTime now = rtc.now();
@@ -213,7 +251,7 @@ void setTime()
       }
       break;
     }
-    setupAlarmTimer++;
+    setupTimeTimer++;
   }
 
   LCD.setBrightness(LCDBrightness);
@@ -221,25 +259,44 @@ void setTime()
   LCD.showNumberDecEx(timeH, (0x80 >> 1), false, 2, 0);
 
   mainTimer = 0;
-  setupAlarmTimer = 0;
 }
 void fireAlarm()
 {
-  if (timeH == alarmH && timeM == alarmM && !alarmON)
+  if (timeH == alarmH && timeM == alarmM && alarmSet && !alarmON)
   {
+    playerCommand(0x0F, 0x01, random(1, numFold1 + 1));
+    playerCommand(0x19, 0x00, 0x00);
     alarmON = true;
-  }
-  if (alarmON)
-  {
-    
+    alarmPlay = true;
   }
 }
+void trackButton(int folder, int track = 0x01)
+{
+  if (alarmPlay || trackPlay)
+  {
+    playerCommand(0x16);
+    alarmPlay = false;
+    trackPlay = false;
+    Serial.println("button STOP");
+  }
+  else
+  {
+    playerCommand(0x0F, folder, track);
+    playerCommand(0x19, 0x00, 0x00);
+    trackPlay = true;
 
+    Serial.println("button PLAY");
+  }
+  mainTimer = 0;
+}
 void setup()
 {
+  randomSeed(analogRead(A0));
   LCD.setBrightness(7);
   FastLED.addLeds<WS2812B, 8, GRB>(leds, 1); // GRB ordering is typical
   Serial.begin(9600);
+  blinkRed();
+  player.begin(9600);
   blinkRed();
   if (!rtc.begin())
   {
@@ -253,31 +310,44 @@ void setup()
   pinMode(5, INPUT_PULLUP);
   pinMode(6, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
-
-  delay(500);
   blinkRed();
-  
-  // inicjalizacja karty SD
-  playerCommand(0x09, 0x0002);
-  delay(200);
-  blinkRed(2);
 
-  for (int i = 0; i < 256; i++)
-  {
-    leds[0] = CHSV(i, 255, 255);
-    FastLED.show();
-    delay(5);
-  }
-  for (int i = 255; i > 0; i--)
-  {
-    leds[0] = CHSV(i, 255, 255);
-    FastLED.show();
-    delay(5);
-  }
-  blinkBlue(3);
+  // inicjalizacja karty SD
+  playerCommand(CMD_SEL_DEV, 0x00, 0x02);
+  delay(100);
+  blinkBlue();
+
+  // for (int i = 0; i < 256; i++)
+  // {
+  //   leds[0] = CHSV(i, 255, 255);
+  //   FastLED.show();
+  //   delay(5);
+  // }
+  // for (int i = 255; i > 0; i--)
+  // {
+  //   leds[0] = CHSV(i, 255, 255);
+  //   FastLED.show();
+  //   delay(5);
+  // }
+  // blinkBlue(3);
 
   // this is to set a time from a computer
   //  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  playerCommand(0x06, 0x00, 0x0F); // Ustaw glosnosc
+  playerCommand(0x4e, 0x00, 0x01); // ask for number of tracks
+  delay(200);
+  if (player.available())
+  {
+    if (playerAnswer()) // Jesli jest poporawna odpowiedz
+    {
+      if (ansbuf[3] == 0x4e) // Aktualnie odtwarzany
+      {
+        numFold1 = ansbuf[6];
+        Serial.println(numFold1);
+      }
+    }
+  }
+  blinkRed();
 }
 
 void loop()
@@ -286,14 +356,54 @@ void loop()
   fireAlarm();
   if (digitalRead(2) == LOW && mainTimer > 150)
   {
-    setAlarm();
+    int pressedTime = 0;
+    while (digitalRead(2) == LOW)
+    {
+      pressedTime++;
+      if (pressedTime > 1500)
+      {
+        setAlarm();
+        break;
+      }
+      delay(1);
+    }
+    if (pressedTime < 1500)
+    {
+      alarmSet = !alarmSet;
+      alarmLED(255);
+      mainTimer = 0;
+    }
   }
   if (digitalRead(6) == LOW && mainTimer > 150)
   {
-    setTime();
+    int pressedTime = 0;
+    while (digitalRead(6) == LOW)
+    {
+      pressedTime++;
+      if (pressedTime > 2001)
+      {
+        setTime();
+        break;
+      }
+      delay(1);
+    }
+    mainTimer = 0;
+  }
+  alarmLED(100);
+  if (digitalRead(3) == LOW && mainTimer > 150)
+  {
+    trackButton(0x01, random(1, numFold1 + 1));
+  }
+  if (digitalRead(4) == LOW && mainTimer > 150)
+  {
+    trackButton(0x02);
+  }
+  if (digitalRead(5) == LOW && mainTimer > 150)
+  {
+    trackButton(0x03);
   }
 
-  alarmLED(100);
+  //main timer increase
   if (mainTimer < 200)
   {
     mainTimer++;
