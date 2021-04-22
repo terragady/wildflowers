@@ -236,7 +236,7 @@ void fireAlarm()
 {
   if (timeH == alarmH && timeM == alarmM && alarmSet && !alarmON)
   {
-    playerCommand(0x0F, 0x01, random(1, numFold1 + 1));
+    playerCommand(0x0F, 0x03, 0x01);
     playerCommand(0x19, 0x00, 0x00);
     alarmON = true;
     alarmPlay = true;
