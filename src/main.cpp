@@ -38,25 +38,6 @@ boolean trackPlay = false;
 // player commands
 #define CMD_SEL_DEV 0X09
 
-boolean playerAnswer(void)
-{
-  uint8_t i = 0;
-
-  // Pobieramy tylko 10 bajtow
-  while (player.available() && (i < 10))
-  {
-    uint8_t b = player.read();
-    ansbuf[i] = b;
-    i++;
-  }
-
-  if ((ansbuf[0] == 0x7E) && (ansbuf[9] == 0xEF))
-  {
-    return true;
-  }
-
-  return false;
-}
 void playerCommand(int8_t cmd, int8_t dat1 = 0, int8_t dat2 = 0)
 {
   delay(20);
@@ -336,17 +317,7 @@ void setup()
   playerCommand(0x06, 0x00, 0x0F); // Ustaw glosnosc
   playerCommand(0x4e, 0x00, 0x01); // ask for number of tracks
   delay(200);
-  if (player.available())
-  {
-    if (playerAnswer()) // Jesli jest poporawna odpowiedz
-    {
-      if (ansbuf[3] == 0x4e) // Aktualnie odtwarzany
-      {
-        numFold1 = ansbuf[6];
-        Serial.println(numFold1);
-      }
-    }
-  }
+  
   blinkRed();
 }
 
