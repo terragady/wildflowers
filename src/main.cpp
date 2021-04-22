@@ -237,12 +237,15 @@ void fireAlarm()
   if (timeH == alarmH && timeM == alarmM && alarmSet && !alarmON)
   {
     playerCommand(0x0F, 0x03, 0x01);
-    playerCommand(0x19, 0x00, 0x00);
+        // for random track use this
+        // random(1, numFold1 + 1)
+
+    // playerCommand(0x19, 0x00, 0x00);
     alarmON = true;
     alarmPlay = true;
   }
 }
-void trackButton(int folder, int track = 0x01)
+void trackButton(int folder, int track = 0x00)
 {
   if (alarmPlay || trackPlay)
   {
@@ -254,7 +257,7 @@ void trackButton(int folder, int track = 0x01)
   else
   {
     playerCommand(0x0F, folder, track);
-    playerCommand(0x19, 0x00, 0x00);
+    // playerCommand(0x19, 0x00, 0x00);
     trackPlay = true;
 
     Serial.println("button PLAY");
@@ -353,7 +356,9 @@ void loop()
   alarmLED(255);
   if (digitalRead(3) == LOW && mainTimer > 150)
   {
-    trackButton(0x01, random(1, numFold1 + 1));
+    trackButton(0x01
+    // , random(1, numFold1 + 1)
+    );
   }
   if (digitalRead(4) == LOW && mainTimer > 150)
   {
