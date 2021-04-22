@@ -22,7 +22,6 @@ int LEDState = 0;
 int spin = 0;
 int LCDBrightness = 7;
 static uint8_t cmdbuf[8] = {0};
-static uint8_t ansbuf[10] = {0};
 int numFold1 = 0;
 
 //Timers
@@ -88,18 +87,10 @@ void blinkRed(int times = 1)
 void updateTime()
 {
   DateTime now = rtc.now();
-  if (timeH >= 18 || timeH <= 6)
-  {
-    LCDBrightness = 2;
-  }
-  else
-  {
-    LCDBrightness = 7;
-  }
   if (now.minute() != timeM)
   {
     timeM = now.minute();
-    LCD.setBrightness(LCDBrightness);
+    LCD.setBrightness(7);
     LCD.showNumberDecEx(timeM, (0x80 >> 1), true, 2, 2);
     if (alarmON)
       alarmON = false;
@@ -130,7 +121,7 @@ void setAlarm()
   LCD.setBrightness(7);
   LCD.showNumberDec(alarmH, false, 2, 0);
   LCD.showNumberDec(alarmM, true, 2, 2);
-  while (digitalRead(2) == LOW)
+  while (digitalRead(6) == LOW)
   {
   }
   while (setupAlarmTimer < 2500)
@@ -165,7 +156,7 @@ void setAlarm()
       setupAlarmTimer = 0;
       alarmSet = !alarmSet;
     }
-    if (digitalRead(2) == LOW && setupAlarmTimer > 200)
+    if (digitalRead(6) == LOW && setupAlarmTimer > 200)
     {
       break;
     }
@@ -188,7 +179,7 @@ void setTime()
   LCD.showNumberDec(timeM, true, 2, 2);
   leds[0] = CHSV(120, 255, 255);
   FastLED.show();
-  while (digitalRead(6) == LOW)
+  while (digitalRead(2) == LOW)
   {
   }
   while (setupTimeTimer < 2500)
@@ -222,7 +213,7 @@ void setTime()
     }
     digitalRead(3) == HIGH &&digitalRead(4) == HIGH ? spin = 0 : spin = spin;
 
-    if (digitalRead(6) == LOW && setupTimeTimer > 200)
+    if (digitalRead(2) == LOW && setupTimeTimer > 200)
     {
       //bring back the clock after setup
       DateTime now = rtc.now();
@@ -314,8 +305,7 @@ void setup()
 
   // this is to set a time from a computer
   //  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  playerCommand(0x06, 0x00, 0x0F); // Ustaw glosnosc
-  playerCommand(0x4e, 0x00, 0x01); // ask for number of tracks
+  playerCommand(0x06, 0x00, 0x1E); // Ustaw glosnosc
   delay(200);
   
   blinkRed();
@@ -325,10 +315,10 @@ void loop()
 {
   updateTime();
   fireAlarm();
-  if (digitalRead(2) == LOW && mainTimer > 150)
+  if (digitalRead(6) == LOW && mainTimer > 150)
   {
     int pressedTime = 0;
-    while (digitalRead(2) == LOW)
+    while (digitalRead(6) == LOW)
     {
       pressedTime++;
       if (pressedTime > 1500)
@@ -345,10 +335,10 @@ void loop()
       mainTimer = 0;
     }
   }
-  if (digitalRead(6) == LOW && mainTimer > 150)
+  if (digitalRead(2) == LOW && mainTimer > 150)
   {
     int pressedTime = 0;
-    while (digitalRead(6) == LOW)
+    while (digitalRead(2) == LOW)
     {
       pressedTime++;
       if (pressedTime > 2001)
@@ -360,7 +350,7 @@ void loop()
     }
     mainTimer = 0;
   }
-  alarmLED(100);
+  alarmLED(255);
   if (digitalRead(3) == LOW && mainTimer > 150)
   {
     trackButton(0x01, random(1, numFold1 + 1));
