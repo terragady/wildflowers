@@ -14,22 +14,26 @@ RTC_DS1307 rtc;
 TM1637Display LCD(12, 11);
 
 //Variables
+bool debug = false;
 int timeH;
 int timeM;
-int alarmH = 16;
-int alarmM = 17;
+int alarmH = 14;
+int alarmM = 47;
 int LEDState = 0;
 int spin = 0;
-int LCDBrightness = 7;
+int LCDBrightness = 2;
 static uint8_t cmdbuf[8] = {0};
 int numFold1 = 0;
+uint8_t defaultVolume = 0x10;
+int AlarmONLED = 0;
+unsigned int TrackPlayTimer = 0;
 
 //Timers
 //internal timer when setting alarm
 int mainTimer = 0;
 
 //Statuses
-boolean alarmSet = false;
+boolean alarmSet = true;
 boolean alarmON = false;
 boolean alarmPlay = false;
 boolean trackPlay = false;
@@ -90,10 +94,16 @@ void updateTime()
   if (now.minute() != timeM)
   {
     timeM = now.minute();
-    LCD.setBrightness(7);
+    // LCD.setBrightness(LCDBrightness);
     LCD.showNumberDecEx(timeM, (0x80 >> 1), true, 2, 2);
     if (alarmON)
-      alarmON = false;
+    alarmON = false;
+    // Serial.println(TrackPlayTimer);
+    // Serial.println(millis()-TrackPlayTimer);
+    if (trackPlay && millis()-TrackPlayTimer > 1800000) {
+      trackPlay = false;
+      if(debug) Serial.println("TIMER RESETTED");
+    }
   }
   if (now.hour() != timeH)
   {
@@ -104,6 +114,29 @@ void updateTime()
 }
 void alarmLED(int br = 255)
 {
+  // set the blue light flashing during alarm ON
+  // if (alarmPlay)
+  // {
+  //   if (mainTimer == 190)
+  //   {
+  //   Serial.println("LED blinking");
+  //   Serial.println(AlarmONLED);
+  //     if (AlarmONLED)
+  //     {
+  //       leds[0] = CRGB::Black;
+  //       FastLED.show();
+  //     }
+  //     else
+  //     {
+  //       FastLED.setBrightness(br);
+  //       leds[0] = CRGB::Blue;
+  //       FastLED.show();
+  //     }
+  //     AlarmONLED = !AlarmONLED;
+  //     mainTimer = 0;
+  //   }
+  // }
+
   if (alarmSet)
   {
     leds[0] = CHSV(0, 255, br);
@@ -236,38 +269,40 @@ void fireAlarm()
 {
   if (timeH == alarmH && timeM == alarmM && alarmSet && !alarmON)
   {
-    playerCommand(0x0F, 0x03, 0x01);
-        // for random track use this
-        // random(1, numFold1 + 1)
-
+    playerCommand(0x06, 0x00, 0x1E); // Ustaw glosnosc
+    playerCommand(0x0F, 0x04, 0x01);
+    // for random track use this
+    // random(1, numFold1 + 1)
     // playerCommand(0x19, 0x00, 0x00);
     alarmON = true;
     alarmPlay = true;
   }
 }
-void trackButton(int folder, int track = 0x00)
+void trackButton(int folder, int track = 0x01)
 {
   if (alarmPlay || trackPlay)
   {
     playerCommand(0x16);
+    playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     alarmPlay = false;
     trackPlay = false;
-    Serial.println("button STOP");
+    if(debug) Serial.println("button STOP");
   }
   else
   {
+    playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     playerCommand(0x0F, folder, track);
-    // playerCommand(0x19, 0x00, 0x00);
+    playerCommand(0x19, 0x00, 0x00);
     trackPlay = true;
-
-    Serial.println("button PLAY");
+    TrackPlayTimer = millis();
+    if(debug) Serial.println("button PLAY");
   }
   mainTimer = 0;
 }
 void setup()
 {
   randomSeed(analogRead(A0));
-  LCD.setBrightness(7);
+  LCD.setBrightness(LCDBrightness);
   FastLED.addLeds<WS2812B, 8, GRB>(leds, 1); // GRB ordering is typical
   Serial.begin(9600);
   blinkRed();
@@ -308,9 +343,10 @@ void setup()
 
   // this is to set a time from a computer
   //  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
   playerCommand(0x06, 0x00, 0x1E); // Ustaw glosnosc
   delay(200);
-  
+
   blinkRed();
 }
 
@@ -357,7 +393,7 @@ void loop()
   if (digitalRead(3) == LOW && mainTimer > 150)
   {
     trackButton(0x01
-    // , random(1, numFold1 + 1)
+                // , random(1, numFold1 + 1)
     );
   }
   if (digitalRead(4) == LOW && mainTimer > 150)
@@ -373,5 +409,6 @@ void loop()
   if (mainTimer < 200)
   {
     mainTimer++;
+    // Serial.println(trackPlay);
   }
 }
