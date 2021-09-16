@@ -21,7 +21,7 @@ int alarmH = 14;
 int alarmM = 47;
 int LEDState = 0;
 int spin = 0;
-int LCDBrightness = 2;
+int LCDBrightness = 1;
 static uint8_t cmdbuf[8] = {0};
 int numFold1 = 0;
 uint8_t defaultVolume = 0x10;
@@ -114,29 +114,6 @@ void updateTime()
 }
 void alarmLED(int br = 255)
 {
-  // set the blue light flashing during alarm ON
-  // if (alarmPlay)
-  // {
-  //   if (mainTimer == 190)
-  //   {
-  //   Serial.println("LED blinking");
-  //   Serial.println(AlarmONLED);
-  //     if (AlarmONLED)
-  //     {
-  //       leds[0] = CRGB::Black;
-  //       FastLED.show();
-  //     }
-  //     else
-  //     {
-  //       FastLED.setBrightness(br);
-  //       leds[0] = CRGB::Blue;
-  //       FastLED.show();
-  //     }
-  //     AlarmONLED = !AlarmONLED;
-  //     mainTimer = 0;
-  //   }
-  // }
-
   if (alarmSet)
   {
     leds[0] = CHSV(0, 255, br);
@@ -280,13 +257,22 @@ void fireAlarm()
 }
 void trackButton(int folder, int track = 0x01)
 {
-  if (alarmPlay || trackPlay)
+  if (trackPlay)
   {
     playerCommand(0x16);
     playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     alarmPlay = false;
     trackPlay = false;
     if(debug) Serial.println("button STOP");
+  }
+  else if (alarmPlay)
+  {
+    alarmPlay = false;
+    trackPlay = true;
+    playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
+    playerCommand(0x0F, 0x03, 0x01);
+    playerCommand(0x19, 0x00, 0x00);
+
   }
   else
   {
