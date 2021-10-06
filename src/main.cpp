@@ -6,6 +6,18 @@
 #include <FastLED.h>
 #include <SoftwareSerial.h>
 
+//SETTINGS FOR EIRIK
+//alarm LED brightness from 0 to 255
+ int defaultAlarmLedBrightness = 100;
+
+//default brightness of the LCD
+ int LCDBrightness = 5;
+
+//soundtracks times in [s]
+ long eveningSountrackLength = 5000;
+ long nightSountrackLength = 6;
+ long morningSountrackLength = 7;
+
 //Setup Libraries
 SoftwareSerial player(15, 16);
 
@@ -21,12 +33,12 @@ int alarmH = 14;
 int alarmM = 47;
 int LEDState = 0;
 int spin = 0;
-int LCDBrightness = 1;
 static uint8_t cmdbuf[8] = {0};
 int numFold1 = 0;
 uint8_t defaultVolume = 0x10;
 int AlarmONLED = 0;
-unsigned int TrackPlayTimer = 0;
+long TrackPlayTimer = 0;
+int currentSoundrackPlay = 10;
 
 //Timers
 //internal timer when setting alarm
@@ -97,12 +109,14 @@ void updateTime()
     // LCD.setBrightness(LCDBrightness);
     LCD.showNumberDecEx(timeM, (0x80 >> 1), true, 2, 2);
     if (alarmON)
-    alarmON = false;
+      alarmON = false;
     // Serial.println(TrackPlayTimer);
     // Serial.println(millis()-TrackPlayTimer);
-    if (trackPlay && millis()-TrackPlayTimer > 1800000) {
+    if (trackPlay && millis() - TrackPlayTimer > 1800000)
+    {
       trackPlay = false;
-      if(debug) Serial.println("TIMER RESETTED");
+      if (debug)
+        Serial.println("TIMER RESETTED");
     }
   }
   if (now.hour() != timeH)
@@ -263,7 +277,8 @@ void trackButton(int folder, int track = 0x01)
     playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     alarmPlay = false;
     trackPlay = false;
-    if(debug) Serial.println("button STOP");
+    if (debug)
+      Serial.println("button STOP");
   }
   else if (alarmPlay)
   {
@@ -272,16 +287,17 @@ void trackButton(int folder, int track = 0x01)
     playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     playerCommand(0x0F, 0x03, 0x01);
     playerCommand(0x19, 0x00, 0x00);
-
   }
   else
   {
+    currentSoundrackPlay = folder;
     playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     playerCommand(0x0F, folder, track);
     playerCommand(0x19, 0x00, 0x00);
     trackPlay = true;
     TrackPlayTimer = millis();
-    if(debug) Serial.println("button PLAY");
+    if (debug)
+      Serial.println("button PLAY");
   }
   mainTimer = 0;
 }
@@ -338,6 +354,27 @@ void setup()
 
 void loop()
 {
+  //function to check the time of the soundtrack
+  if (trackPlay)
+  {
+    long temp;
+    if (currentSoundrackPlay == 0x01)
+      temp = eveningSountrackLength*1000;
+    if (currentSoundrackPlay == 0x02)
+      temp = nightSountrackLength*1000;
+    if (currentSoundrackPlay == 0x03)
+      temp = morningSountrackLength*1000;
+    if (millis() - TrackPlayTimer > temp)
+    {
+      if (debug) {
+        Serial.println(temp);
+        Serial.println("Soundracked stopped automatically");
+      }
+      playerCommand(0x16);
+      playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
+      trackPlay = false;
+    }
+  }
   updateTime();
   fireAlarm();
   if (digitalRead(6) == LOW && mainTimer > 150)
@@ -375,7 +412,7 @@ void loop()
     }
     mainTimer = 0;
   }
-  alarmLED(255);
+  alarmLED(defaultAlarmLedBrightness);
   if (digitalRead(3) == LOW && mainTimer > 150)
   {
     trackButton(0x01
