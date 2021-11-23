@@ -8,15 +8,15 @@
 
 //SETTINGS FOR EIRIK
 //alarm LED brightness from 0 to 255
- int defaultAlarmLedBrightness = 100;
+int defaultAlarmLedBrightness = 100;
 
 //default brightness of the LCD
- int LCDBrightness = 5;
+int LCDBrightness = 2;
 
 //soundtracks times in [s]
- long eveningSountrackLength = 5000;
- long nightSountrackLength = 6;
- long morningSountrackLength = 7;
+long eveningSountrackLength = 5000;
+long nightSountrackLength = 15;
+long morningSountrackLength = 7;
 
 //Setup Libraries
 SoftwareSerial player(15, 16);
@@ -29,8 +29,8 @@ TM1637Display LCD(12, 11);
 bool debug = false;
 int timeH;
 int timeM;
-int alarmH = 14;
-int alarmM = 47;
+int alarmH = 06;
+int alarmM = 30;
 int LEDState = 0;
 int spin = 0;
 static uint8_t cmdbuf[8] = {0};
@@ -262,6 +262,7 @@ void fireAlarm()
   {
     playerCommand(0x06, 0x00, 0x1E); // Ustaw glosnosc
     playerCommand(0x0F, 0x04, 0x01);
+    TrackPlayTimer = millis();
     // for random track use this
     // random(1, numFold1 + 1)
     // playerCommand(0x19, 0x00, 0x00);
@@ -284,14 +285,18 @@ void trackButton(int folder, int track = 0x01)
   {
     alarmPlay = false;
     trackPlay = true;
+    currentSoundrackPlay = 0x03;
+    TrackPlayTimer = millis();
     playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
     playerCommand(0x0F, 0x03, 0x01);
     playerCommand(0x19, 0x00, 0x00);
+    if (debug)
+      Serial.println("playing morning soundtrack after alarm");
   }
   else
   {
     currentSoundrackPlay = folder;
-    playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
+    playerCommand(0x06, 0x00, folder == 0x02 ? defaultVolume+0x05 : defaultVolume); // Ustaw glosnosc
     playerCommand(0x0F, folder, track);
     playerCommand(0x19, 0x00, 0x00);
     trackPlay = true;
@@ -344,7 +349,7 @@ void setup()
   // blinkBlue(3);
 
   // this is to set a time from a computer
-  //  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   // playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
   playerCommand(0x06, 0x00, 0x1E); // Ustaw glosnosc
   delay(200);
@@ -359,20 +364,27 @@ void loop()
   {
     long temp;
     if (currentSoundrackPlay == 0x01)
-      temp = eveningSountrackLength*1000;
+      temp = eveningSountrackLength * 1000;
     if (currentSoundrackPlay == 0x02)
-      temp = nightSountrackLength*1000;
+      temp = nightSountrackLength * 1000;
     if (currentSoundrackPlay == 0x03)
-      temp = morningSountrackLength*1000;
+      temp = morningSountrackLength * 1000;
     if (millis() - TrackPlayTimer > temp)
     {
-      if (debug) {
+      if (debug)
+      {
         Serial.println(temp);
-        Serial.println("Soundracked stopped automatically");
+        Serial.println("Soundtrack stopped automatically after given time");
       }
       playerCommand(0x16);
       playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
       trackPlay = false;
+    }
+  }
+  if (alarmPlay){
+    long temp = 180000;
+    if (millis() - TrackPlayTimer > temp){
+      trackButton(0x03);
     }
   }
   updateTime();
