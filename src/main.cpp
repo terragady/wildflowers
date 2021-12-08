@@ -306,6 +306,7 @@ void trackButton(int folder, int track = 0x01)
   }
   mainTimer = 0;
 }
+
 void setup()
 {
   randomSeed(analogRead(A0));
@@ -349,7 +350,7 @@ void setup()
   // blinkBlue(3);
 
   // this is to set a time from a computer
-   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  //  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   // playerCommand(0x06, 0x00, defaultVolume); // Ustaw glosnosc
   playerCommand(0x06, 0x00, 0x1E); // Ustaw glosnosc
   delay(200);
